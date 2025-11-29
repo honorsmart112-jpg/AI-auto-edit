@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { VideoPlayer } from './components/VideoPlayer';
 import { Timeline } from './components/Timeline';
 import { Sidebar } from './components/Sidebar';
-import { AnalysisResult, SmartZoom, CutSegment } from './types';
+import { ExportModal, ExportSettings } from './components/ExportModal';
+import { AnalysisResult, SmartZoom, CutSegment, Highlight } from './types';
 import { analyzeVideoWithGemini } from './services/geminiService';
 import { saveVideoToDB, getVideoFromDB } from './services/storage';
-import { Upload, Sparkles, AlertCircle, Loader2, Undo, Redo } from 'lucide-react';
+import { Upload, Sparkles, AlertCircle, Loader2, Undo, Redo, Download, CheckCircle2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -19,8 +20,17 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<AnalysisResult[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
+  // Zoom Picking State
+  const [pickingZoomIndex, setPickingZoomIndex] = useState<number | null>(null);
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Export State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStage, setExportStage] = useState('');
 
   // Load state from localStorage on mount
   useEffect(() => {
@@ -29,6 +39,9 @@ const App: React.FC = () => {
     
     if (savedAnalysis) {
       const parsed = JSON.parse(savedAnalysis);
+      // Backwards compatibility: ensure highlights array exists
+      if (!parsed.highlights) parsed.highlights = [];
+      
       setAnalysis(parsed);
       // Initialize history with the saved state
       setHistory([parsed]);
@@ -78,6 +91,12 @@ const App: React.FC = () => {
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If picking zoom, Escape cancels
+      if (pickingZoomIndex !== null && e.key === 'Escape') {
+          setPickingZoomIndex(null);
+          return;
+      }
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
@@ -95,7 +114,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, pickingZoomIndex]);
 
 
   // --- Handlers ---
@@ -183,6 +202,13 @@ const App: React.FC = () => {
     pushToHistory(newAnalysis);
   };
 
+  const handleVideoClick = (x: number, y: number) => {
+      if (pickingZoomIndex !== null && analysis) {
+          handleZoomUpdate(pickingZoomIndex, { x, y });
+          setPickingZoomIndex(null); // Exit picking mode
+      }
+  };
+
   const handleCutUpdate = (index: number, updatedFields: Partial<CutSegment>) => {
     if (!analysis) return;
     const updatedCuts = [...analysis.cuts];
@@ -199,6 +225,95 @@ const App: React.FC = () => {
     const newAnalysis = { ...analysis, cuts: updatedCuts };
     pushToHistory(newAnalysis);
   };
+
+  const handlePromoteCutToHighlight = (index: number) => {
+    if (!analysis) return;
+    
+    const cut = analysis.cuts[index];
+    
+    // 1. Remove from cuts
+    const updatedCuts = analysis.cuts.filter((_, i) => i !== index);
+
+    // 2. Add to highlights
+    const newHighlight: Highlight = {
+        start: cut.start,
+        end: cut.end,
+        label: "Highlighted Segment" // Default label
+    };
+    const updatedHighlights = [...(analysis.highlights || []), newHighlight];
+
+    const newAnalysis = { 
+        ...analysis, 
+        cuts: updatedCuts,
+        highlights: updatedHighlights 
+    };
+    pushToHistory(newAnalysis);
+  };
+
+  const handleHighlightUpdate = (index: number, updatedFields: Partial<Highlight>) => {
+    if (!analysis) return;
+    const updatedHighlights = [...analysis.highlights];
+    updatedHighlights[index] = { ...updatedHighlights[index], ...updatedFields };
+
+    const newAnalysis = { ...analysis, highlights: updatedHighlights };
+    pushToHistory(newAnalysis);
+  };
+
+  const handleHighlightDelete = (index: number) => {
+    if (!analysis) return;
+    const updatedHighlights = analysis.highlights.filter((_, i) => i !== index);
+    
+    const newAnalysis = { ...analysis, highlights: updatedHighlights };
+    pushToHistory(newAnalysis);
+  };
+
+  // --- Export Logic ---
+
+  const handleStartExport = async (settings: ExportSettings) => {
+    setShowExportModal(false);
+    setIsExporting(true);
+    setExportProgress(0);
+
+    // Simulation steps
+    const steps = [
+        { progress: 10, stage: 'Analyzing Edit Decision List (EDL)...' },
+        { progress: 30, stage: 'Processing Cuts & Trimming...' },
+        { progress: 50, stage: `Applying Smart Zooms (${settings.resolution})...` },
+        { progress: 70, stage: 'Burning Subtitles (Bahasa Melayu KL)...' },
+        { progress: 90, stage: `Encoding to ${settings.format.toUpperCase()} (${settings.quality})...` },
+        { progress: 100, stage: 'Finalizing...' }
+    ];
+
+    for (const step of steps) {
+        setExportStage(step.stage);
+        setExportProgress(step.progress);
+        // Random delay between 800ms and 2000ms per step
+        await new Promise(r => setTimeout(r, Math.random() * 1200 + 800));
+    }
+
+    // "Finish"
+    setIsExporting(false);
+    
+    // Create a dummy download
+    const exportData = {
+        project: "Bina AI Auto Edit",
+        date: new Date().toISOString(),
+        settings: settings,
+        analysisResult: analysis
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bina_ai_export_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert(`Export Complete! \n\n(Note: In this demo, we generated a JSON manifest of your edits. A real production app would use FFmpeg to render the .${settings.format} file.)`);
+  };
+
 
   return (
     <div className="flex flex-col h-screen bg-neutral-950 text-neutral-100 font-sans">
@@ -242,6 +357,17 @@ const App: React.FC = () => {
                   {isAnalyzing ? 'Analyzing...' : 'Auto-Edit with Gemini 2.5'}
                </button>
            )}
+           
+           {analysis && (
+               <button
+                 onClick={() => setShowExportModal(true)}
+                 className="flex items-center gap-2 bg-neutral-100 hover:bg-white text-neutral-900 px-4 py-1.5 rounded-full text-sm font-bold transition-all shadow-lg shadow-white/10"
+               >
+                   <Download size={16} />
+                   Export
+               </button>
+           )}
+
            <label className="cursor-pointer bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-4 py-1.5 rounded-full text-sm transition-colors border border-neutral-700 flex items-center gap-2">
              <Upload size={14} />
              <span>Import Video</span>
@@ -270,6 +396,9 @@ const App: React.FC = () => {
                     currentTime={currentTime}
                     onTimeUpdate={setCurrentTime}
                     onDurationChange={setDuration}
+                    // Picking props
+                    isPickingZoom={pickingZoomIndex !== null}
+                    onVideoClick={handleVideoClick}
                  />
                </div>
             </div>
@@ -295,8 +424,54 @@ const App: React.FC = () => {
           onZoomUpdate={handleZoomUpdate}
           onCutUpdate={handleCutUpdate}
           onCutDelete={handleCutDelete}
+          onPromoteCut={handlePromoteCutToHighlight}
+          onHighlightUpdate={handleHighlightUpdate}
+          onHighlightDelete={handleHighlightDelete}
+          // Zoom picking
+          pickingZoomIndex={pickingZoomIndex}
+          setPickingZoomIndex={setPickingZoomIndex}
         />
       </div>
+
+      {/* Modals & Overlays */}
+      <ExportModal 
+        isOpen={showExportModal} 
+        onClose={() => setShowExportModal(false)} 
+        onExport={handleStartExport} 
+      />
+
+      {isExporting && (
+          <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center text-center">
+              <div className="w-full max-w-md space-y-6">
+                  <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
+                      <svg className="w-full h-full" viewBox="0 0 100 100">
+                          <circle className="text-neutral-800 stroke-current" strokeWidth="6" cx="50" cy="50" r="40" fill="transparent"></circle>
+                          <circle 
+                            className="text-blue-500 progress-ring__circle stroke-current transition-all duration-300 ease-out" 
+                            strokeWidth="6" 
+                            strokeLinecap="round" 
+                            cx="50" 
+                            cy="50" 
+                            r="40" 
+                            fill="transparent" 
+                            strokeDasharray="251.2" 
+                            strokeDashoffset={251.2 - (251.2 * exportProgress) / 100}
+                            style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }}
+                          ></circle>
+                      </svg>
+                      <span className="absolute text-xl font-bold text-white">{exportProgress}%</span>
+                  </div>
+                  
+                  <div className="space-y-2">
+                      <h2 className="text-2xl font-bold text-white animate-pulse">Exporting Video...</h2>
+                      <p className="text-blue-400 font-mono text-sm">{exportStage}</p>
+                  </div>
+
+                  <p className="text-neutral-500 text-xs mt-8">Please do not close this tab.</p>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 };

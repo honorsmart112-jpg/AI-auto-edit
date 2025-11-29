@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { AnalysisResult } from "../types";
+import { AnalysisResult, SmartZoom } from "../types";
 
 const SYSTEM_INSTRUCTION = `
 You are Bina AI, an expert automated video editor. 
@@ -68,6 +68,17 @@ const RESPONSE_SCHEMA: Schema = {
   required: ["cuts", "chapters", "zooms", "subtitles"],
 };
 
+// Helper to convert legacy enum targets to coordinates
+const getCoordinatesForTarget = (target: string): { x: number, y: number } => {
+  switch (target) {
+    case 'top-left': return { x: 20, y: 20 };
+    case 'top-right': return { x: 80, y: 20 };
+    case 'bottom-left': return { x: 20, y: 80 };
+    case 'bottom-right': return { x: 80, y: 80 };
+    default: return { x: 50, y: 50 };
+  }
+};
+
 export const analyzeVideoWithGemini = async (videoFile: File): Promise<AnalysisResult> => {
   if (!process.env.API_KEY) {
     throw new Error("API Key missing");
@@ -76,8 +87,6 @@ export const analyzeVideoWithGemini = async (videoFile: File): Promise<AnalysisR
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   // Convert File to Base64 for the API
-  // Note: For large production apps, we would use the File API upload manager. 
-  // For this demo, we convert to base64 client-side which has size limits (approx 20MB safe limit).
   const base64Data = await fileToBase64(videoFile);
   
   const response = await ai.models.generateContent({
@@ -105,7 +114,25 @@ export const analyzeVideoWithGemini = async (videoFile: File): Promise<AnalysisR
   const jsonText = response.text;
   if (!jsonText) throw new Error("No response from AI");
   
-  return JSON.parse(jsonText) as AnalysisResult;
+  const result = JSON.parse(jsonText) as Partial<AnalysisResult>;
+
+  // Normalize zooms with X/Y coordinates
+  const zooms = (result.zooms || []).map(z => {
+      const coords = getCoordinatesForTarget(z.target);
+      return {
+          ...z,
+          x: z.x ?? coords.x,
+          y: z.y ?? coords.y
+      } as SmartZoom;
+  });
+
+  return {
+    cuts: result.cuts || [],
+    chapters: result.chapters || [],
+    zooms: zooms,
+    subtitles: result.subtitles || [],
+    highlights: result.highlights || []
+  };
 };
 
 const fileToBase64 = (file: File): Promise<string> => {
@@ -114,7 +141,6 @@ const fileToBase64 = (file: File): Promise<string> => {
     reader.readAsDataURL(file);
     reader.onload = () => {
       const result = reader.result as string;
-      // Remove the Data URL prefix (e.g., "data:video/mp4;base64,")
       const base64 = result.split(',')[1];
       resolve(base64);
     };

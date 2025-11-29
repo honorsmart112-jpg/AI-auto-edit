@@ -14,6 +14,8 @@ export interface SmartZoom {
   end: number;
   target: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   description: string;
+  x?: number; // 0-100 percentage
+  y?: number; // 0-100 percentage
 }
 
 export interface Subtitle {
@@ -22,11 +24,18 @@ export interface Subtitle {
   text: string;
 }
 
+export interface Highlight {
+  start: number;
+  end: number;
+  label: string;
+}
+
 export interface AnalysisResult {
   cuts: CutSegment[];
   chapters: Chapter[];
   zooms: SmartZoom[];
   subtitles: Subtitle[];
+  highlights: Highlight[];
 }
 
 export interface ProjectState {

@@ -53,7 +53,26 @@ export const Timeline: React.FC<TimelineProps> = ({
 
         <div className="flex flex-col gap-1 p-2 pt-6 relative z-10" onClick={handleClick}>
           
-          {/* Track 1: Cuts (Red) */}
+          {/* Track 1: Highlights (Gold) - Only show if there are highlights */}
+          {analysis?.highlights && analysis.highlights.length > 0 && (
+             <div className="h-6 w-full relative bg-neutral-800/50 rounded overflow-hidden">
+                <span className="absolute left-2 top-[2px] text-[10px] text-neutral-500 uppercase tracking-wider font-bold z-10 pointer-events-none">Highlights</span>
+                {analysis.highlights.map((hl, i) => (
+                  <div
+                    key={i}
+                    className="absolute h-full bg-amber-500/40 border-l border-r border-amber-500 hover:bg-amber-500/60 transition-colors cursor-pointer group"
+                    style={{ left: getLeft(hl.start), width: getWidth(hl.start, hl.end) }}
+                    title={hl.label}
+                  >
+                      <div className="hidden group-hover:block absolute -top-8 left-0 bg-neutral-800 text-xs px-2 py-1 rounded border border-neutral-700 whitespace-nowrap z-50 text-white">
+                          {hl.label}
+                      </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {/* Track 2: Cuts (Red) */}
           <div className="h-6 w-full relative bg-neutral-800/50 rounded overflow-hidden">
             <span className="absolute left-2 top-[2px] text-[10px] text-neutral-500 uppercase tracking-wider font-bold z-10 pointer-events-none">Cuts</span>
             {analysis?.cuts.map((cut, i) => (
@@ -70,7 +89,7 @@ export const Timeline: React.FC<TimelineProps> = ({
             ))}
           </div>
 
-          {/* Track 2: Zooms (Blue) */}
+          {/* Track 3: Zooms (Blue) */}
           <div className="h-6 w-full relative bg-neutral-800/50 rounded overflow-hidden">
             <span className="absolute left-2 top-[2px] text-[10px] text-neutral-500 uppercase tracking-wider font-bold z-10 pointer-events-none">Zoom</span>
             {analysis?.zooms.map((zoom, i) => (
@@ -83,7 +102,7 @@ export const Timeline: React.FC<TimelineProps> = ({
             ))}
           </div>
 
-          {/* Track 3: Subtitles (Green) */}
+          {/* Track 4: Subtitles (Green) */}
           <div className="h-6 w-full relative bg-neutral-800/50 rounded overflow-hidden">
              <span className="absolute left-2 top-[2px] text-[10px] text-neutral-500 uppercase tracking-wider font-bold z-10 pointer-events-none">Subs (KL)</span>
             {analysis?.subtitles.map((sub, i) => (
