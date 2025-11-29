@@ -1,5 +1,5 @@
 {
-  "name": "Bina AI Auto Edit",
+  "name": "Auto Edit Video",
   "description": "An intelligent video editor that uses Gemini 2.5 to automatically cut silence, generate chapters, create smart zooms, and write Malay KL subtitles.",
   "requestFramePermissions": []
 }

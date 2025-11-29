@@ -189,6 +189,37 @@ const App: React.FC = () => {
     pushToHistory(newAnalysis);
   };
 
+  const handleAddZoom = () => {
+    if (!analysis) return;
+    
+    // Create new zoom starting at current time, default duration 3s
+    const start = currentTime;
+    const end = Math.min(duration, start + 3);
+    
+    const newZoom: SmartZoom = {
+        start,
+        end,
+        target: 'center', // legacy fallback, using x/y mainly
+        description: 'Manual Focus',
+        x: 50,
+        y: 50
+    };
+
+    // Append and sort
+    const updatedZooms = [...analysis.zooms, newZoom].sort((a, b) => a.start - b.start);
+    
+    // Find new index to trigger picking mode
+    const newIndex = updatedZooms.indexOf(newZoom);
+
+    const newAnalysis = {
+      ...analysis,
+      zooms: updatedZooms
+    };
+
+    pushToHistory(newAnalysis);
+    setPickingZoomIndex(newIndex);
+  };
+
   const handleZoomUpdate = (index: number, updatedFields: Partial<SmartZoom>) => {
     if (!analysis) return;
     const updatedZooms = [...analysis.zooms];
@@ -422,6 +453,7 @@ const App: React.FC = () => {
           onSubtitleUpdate={handleSubtitleUpdate}
           onSubtitleDelete={handleSubtitleDelete}
           onZoomUpdate={handleZoomUpdate}
+          onAddZoom={handleAddZoom}
           onCutUpdate={handleCutUpdate}
           onCutDelete={handleCutDelete}
           onPromoteCut={handlePromoteCutToHighlight}

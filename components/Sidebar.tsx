@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AnalysisResult, SmartZoom, Subtitle, CutSegment, Highlight } from '../types';
-import { Scissors, type LucideIcon, FileText, ListVideo, Clock, Maximize, Pencil, Check, X, Trash2, AlertTriangle, Search, Star, Zap, Crosshair } from 'lucide-react';
+import { Scissors, type LucideIcon, FileText, ListVideo, Clock, Maximize, Pencil, Check, X, Trash2, AlertTriangle, Search, Star, Zap, Crosshair, Plus } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface SidebarProps {
@@ -9,6 +9,7 @@ interface SidebarProps {
   onSubtitleUpdate: (index: number, newText: string) => void;
   onSubtitleDelete: (index: number) => void;
   onZoomUpdate: (index: number, updatedFields: Partial<SmartZoom>) => void;
+  onAddZoom: () => void;
   onCutUpdate: (index: number, updatedFields: Partial<CutSegment>) => void;
   onCutDelete: (index: number) => void;
   onPromoteCut: (index: number) => void;
@@ -26,6 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onSubtitleUpdate,
     onSubtitleDelete, 
     onZoomUpdate,
+    onAddZoom,
     onCutUpdate,
     onCutDelete,
     onPromoteCut,
@@ -133,52 +135,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {activeTab === 'zooms' && (
-             analysis.zooms.length === 0 ? <EmptyState label="No smart zooms detected" /> :
-             analysis.zooms.map((zoom, i) => {
-                const isPicking = pickingZoomIndex === i;
-                return (
-                    <div key={i} className={`p-3 bg-blue-900/10 hover:bg-blue-900/20 rounded transition-colors border ${isPicking ? 'border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-900/30'} group`}>
-                        <div className="flex justify-between items-center mb-2" onClick={() => onSeek(zoom.start)}>
-                            <span className="text-xs font-mono text-blue-400 cursor-pointer hover:underline">{formatTime(zoom.start)} - {formatTime(zoom.end)}</span>
-                        </div>
-                        
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] text-neutral-500 uppercase tracking-wider font-semibold">Focus Point</span>
-                                    <span className="text-[10px] text-neutral-400 font-mono">
-                                        {zoom.x !== undefined ? `x:${Math.round(zoom.x)}% y:${Math.round(zoom.y)}%` : 'Auto'}
-                                    </span>
-                                </div>
-                                {setPickingZoomIndex && (
-                                    <button
-                                        onClick={() => {
-                                            onSeek(zoom.start);
-                                            setPickingZoomIndex(isPicking ? null : i);
-                                        }}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                                            isPicking 
-                                                ? 'bg-red-500 text-white animate-pulse' 
-                                                : 'bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700'
-                                        }`}
-                                    >
-                                        <Crosshair size={12} />
-                                        {isPicking ? 'Click Video to Set' : 'Set Focus'}
-                                    </button>
-                                )}
+            <div className="space-y-3">
+                <button 
+                    onClick={onAddZoom}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium flex items-center justify-center gap-2 mb-2 transition-colors shadow-lg shadow-blue-900/20"
+                >
+                    <Plus size={14} /> Add Zoom at Current Time
+                </button>
+
+                {analysis.zooms.length === 0 ? <EmptyState label="No smart zooms detected" /> :
+                 analysis.zooms.map((zoom, i) => {
+                    const isPicking = pickingZoomIndex === i;
+                    return (
+                        <div key={i} className={`p-3 bg-blue-900/10 hover:bg-blue-900/20 rounded transition-colors border ${isPicking ? 'border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'border-blue-900/30'} group`}>
+                            <div className="flex justify-between items-center mb-2" onClick={() => onSeek(zoom.start)}>
+                                <span className="text-xs font-mono text-blue-400 cursor-pointer hover:underline">{formatTime(zoom.start)} - {formatTime(zoom.end)}</span>
                             </div>
                             
-                            <input 
-                                type="text"
-                                value={zoom.description}
-                                onChange={(e) => onZoomUpdate(i, { description: e.target.value })}
-                                className="w-full bg-transparent border-b border-neutral-700 text-sm text-neutral-400 focus:text-white focus:border-blue-500 focus:outline-none py-1 placeholder-neutral-600"
-                                placeholder="Zoom description..."
-                            />
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-neutral-500 uppercase tracking-wider font-semibold">Focus Point</span>
+                                        <span className="text-[10px] text-neutral-400 font-mono">
+                                            {zoom.x !== undefined ? `x:${Math.round(zoom.x)}% y:${Math.round(zoom.y)}%` : 'Auto'}
+                                        </span>
+                                    </div>
+                                    {setPickingZoomIndex && (
+                                        <button
+                                            onClick={() => {
+                                                onSeek(zoom.start);
+                                                setPickingZoomIndex(isPicking ? null : i);
+                                            }}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                                                isPicking 
+                                                    ? 'bg-red-500 text-white animate-pulse' 
+                                                    : 'bg-neutral-800 border border-neutral-700 text-neutral-300 hover:bg-neutral-700'
+                                            }`}
+                                        >
+                                            <Crosshair size={12} />
+                                            {isPicking ? 'Click Video to Set' : 'Set Focus'}
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                <input 
+                                    type="text"
+                                    value={zoom.description}
+                                    onChange={(e) => onZoomUpdate(i, { description: e.target.value })}
+                                    className="w-full bg-transparent border-b border-neutral-700 text-sm text-neutral-400 focus:text-white focus:border-blue-500 focus:outline-none py-1 placeholder-neutral-600"
+                                    placeholder="Zoom description..."
+                                />
+                            </div>
                         </div>
-                    </div>
-                );
-             })
+                    );
+                 })
+                }
+            </div>
         )}
 
         {activeTab === 'subtitles' && (
